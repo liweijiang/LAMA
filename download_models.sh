@@ -9,7 +9,8 @@
 set -e
 set -u
 
-ROOD_DIR="$(realpath $(dirname "$0"))"
+# "$(realpath $(dirname "$0"))"
+ROOD_DIR="/Users/liweijiang/Desktop/CSE517NLP/Project/LAMA"
 DST_DIR="$ROOD_DIR/pre-trained_language_models"
 
 mkdir -p "$DST_DIR"

@@ -4,11 +4,11 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-from lama.modules import build_model_by_name
+from modules import build_model_by_name
 from tqdm import tqdm
 import argparse
 import spacy
-import lama.modules.base_connector as base
+import modules.base_connector as base
 
 
 CASED_MODELS = [
