@@ -1,9 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Filename: batch_eval_KB_completion_old.py
+# Author: Liwei Jiang
+# Description: The old data evaluation code for debugging purpose.
+# Date: 03/10/2020
+
 from lama.modules import build_model_by_name
 import lama.utils as utils
 from lama.utils import print_sentence_predictions, load_vocab

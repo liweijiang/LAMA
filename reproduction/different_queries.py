@@ -105,9 +105,3 @@ def parse_facts():
 
 if __name__ == "__main__":
 	facts = parse_facts()
-
-    # parser = options.get_eval_generation_parser()
-    # args = options.parse_args(parser)
-    # main(args)
-
-

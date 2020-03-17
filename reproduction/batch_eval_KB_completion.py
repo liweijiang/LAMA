@@ -1,9 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Filename: batch_eval_KB_completion.py
+# Author: Liwei Jiang
+# Description: The data evaluation code for different queries experiment.
+# Date: 03/10/2020
+
 import sys
 sys.path.append('')
 sys.path.append('../')

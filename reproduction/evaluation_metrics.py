@@ -1,9 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Filename: evaluation_metrics.py
+# Author: Liwei Jiang
+# Description: The evaluation metrics code.
+# Date: 03/10/2020
+
 import torch
 import numpy as np
 import scipy

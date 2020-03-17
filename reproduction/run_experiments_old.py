@@ -1,9 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Filename: run_experiment_old.py
+# Author: Liwei Jiang
+# Description: The old version of the run experiment code for dubugging purpose.
+# Date: 03/10/2020
+
 import sys
 sys.path.append('')
 import argparse
@@ -30,24 +29,24 @@ LMs = [
         "transformerxl_model_dir":
         "pre-trained_language_models/transformerxl/transfo-xl-wt103/"
     },
-    # {
-    #     "lm": "elmo",
-    #     "label": "elmo",
-    #     "models_names": ["elmo"],
-    #     "elmo_model_name": 'elmo_2x4096_512_2048cnn_2xhighway',
-    #     "elmo_vocab_name": 'vocab-2016-09-10.txt',
-    #     "elmo_model_dir": "pre-trained_language_models/elmo/original",
-    #     "elmo_warm_up_cycles": 10
-    # },
-    #     {
-    #     "lm": "elmo",
-    #     "label": "elmo5B",
-    #     "models_names": ["elmo"],
-    #     "elmo_model_name": "elmo_2x4096_512_2048cnn_2xhighway_5.5B",
-    #     "elmo_vocab_name": "vocab-enwiki-news-500000.txt",
-    #     "elmo_model_dir": "pre-trained_language_models/elmo/original5.5B/",
-    #     "elmo_warm_up_cycles": 10
-    # },
+    {
+        "lm": "elmo",
+        "label": "elmo",
+        "models_names": ["elmo"],
+        "elmo_model_name": 'elmo_2x4096_512_2048cnn_2xhighway',
+        "elmo_vocab_name": 'vocab-2016-09-10.txt',
+        "elmo_model_dir": "pre-trained_language_models/elmo/original",
+        "elmo_warm_up_cycles": 10
+    },
+        {
+        "lm": "elmo",
+        "label": "elmo5B",
+        "models_names": ["elmo"],
+        "elmo_model_name": "elmo_2x4096_512_2048cnn_2xhighway_5.5B",
+        "elmo_vocab_name": "vocab-enwiki-news-500000.txt",
+        "elmo_model_dir": "pre-trained_language_models/elmo/original5.5B/",
+        "elmo_warm_up_cycles": 10
+    },
     {
         "lm":
         "bert",
@@ -207,16 +206,14 @@ if __name__ == "__main__":
     parameters = get_GoogleRE_parameters()
     run_all_LMs(parameters)
 
-    # print("2. T-REx")    
-    # parameters = get_TREx_parameters()
-    # run_all_LMs(parameters)
+    print("2. T-REx")    
+    parameters = get_TREx_parameters()
+    run_all_LMs(parameters)
 
-    # print("3. ConceptNet")
-    # parameters = get_ConceptNet_parameters()
-    # run_all_LMs(parameters)
+    print("3. ConceptNet")
+    parameters = get_ConceptNet_parameters()
+    run_all_LMs(parameters)
 
-    # print("4. SQuAD")
-    # parameters = get_Squad_parameters()
-    # run_all_LMs(parameters)
-
-    
+    print("4. SQuAD")
+    parameters = get_Squad_parameters()
+    run_all_LMs(parameters)

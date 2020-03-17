@@ -1,9 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Filename: p_at_k_experiment.py
+# Author: Liwei Jiang
+# Description: The code for generating data for P@k for varying k.
+# Date: 03/10/2020
+
 import sys
 sys.path.append('')
 import argparse
@@ -19,24 +18,24 @@ from shutil import copyfile
 from collections import defaultdict
 
 LMs = [
-    # {
-    #     "lm": "elmo",
-    #     "label": "elmo",
-    #     "models_names": ["elmo"],
-    #     "elmo_model_name": 'elmo_2x4096_512_2048cnn_2xhighway',
-    #     "elmo_vocab_name": 'vocab-2016-09-10.txt',
-    #     "elmo_model_dir": "pre-trained_language_models/elmo/original",
-    #     "elmo_warm_up_cycles": 10
-    # },
-    #     {
-    #     "lm": "elmo",
-    #     "label": "elmo5B",
-    #     "models_names": ["elmo"],
-    #     "elmo_model_name": "elmo_2x4096_512_2048cnn_2xhighway_5.5B",
-    #     "elmo_vocab_name": "vocab-enwiki-news-500000.txt",
-    #     "elmo_model_dir": "pre-trained_language_models/elmo/original5.5B/",
-    #     "elmo_warm_up_cycles": 10
-    # },
+    {
+        "lm": "elmo",
+        "label": "elmo",
+        "models_names": ["elmo"],
+        "elmo_model_name": 'elmo_2x4096_512_2048cnn_2xhighway',
+        "elmo_vocab_name": 'vocab-2016-09-10.txt',
+        "elmo_model_dir": "pre-trained_language_models/elmo/original",
+        "elmo_warm_up_cycles": 10
+    },
+        {
+        "lm": "elmo",
+        "label": "elmo5B",
+        "models_names": ["elmo"],
+        "elmo_model_name": "elmo_2x4096_512_2048cnn_2xhighway_5.5B",
+        "elmo_vocab_name": "vocab-enwiki-news-500000.txt",
+        "elmo_model_dir": "pre-trained_language_models/elmo/original5.5B/",
+        "elmo_warm_up_cycles": 10
+    },
     {
         "lm":
         "transformerxl",

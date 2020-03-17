@@ -1,9 +1,8 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Filename: p_at_k_eval.py
+# Author: Liwei Jiang
+# Description: The data evaluation code for generating data for P@k for varying k.
+# Date: 03/10/2020
+
 import sys
 sys.path.append('')
 sys.path.append('../')
