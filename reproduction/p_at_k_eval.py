@@ -23,9 +23,11 @@ import logging
 import pickle
 from multiprocessing.pool import ThreadPool
 import multiprocessing
-import lama.evaluation_metrics as metrics
+import reproduction.evaluation_metrics as metrics
 import time, sys
+from utils import *
 
+P_AT_K = 10
 
 def load_file(filename):
     data = []
@@ -120,34 +122,6 @@ def batchify(data, batch_size):
     return list_samples_batches, list_sentences_batches, msg
 
 
-def batchify_negated(data, batch_size):
-    msg = ""
-    list_sentences_batches = []
-    current_sentences_batches = []
-    c = 0
-
-    # sort to group togheter sentences with similar length
-    for sample in sorted(
-        data, key=lambda k: len(" ".join(k["masked_sentences"]).split())
-    ):
-        if "negated" in sample:
-            masked_sentences = sample["negated"]
-            current_sentences_batches.append(masked_sentences)
-        else:
-            current_sentences_batches.append([""])
-        c += 1
-        if c >= batch_size:
-            list_sentences_batches.append(current_sentences_batches)
-            current_sentences_batches = []
-            c = 0
-
-    # last batch
-    if current_sentences_batches and len(current_sentences_batches) > 0:
-        list_sentences_batches.append(current_sentences_batches)
-
-    return list_sentences_batches, msg
-
-
 def run_thread(arguments):
 
     msg = ""
@@ -161,66 +135,13 @@ def run_thread(arguments):
         index_list=arguments["index_list"],
         print_generation=arguments["interactive"],
         topk=10000,
+        P_AT=P_AT_K
     )
     msg += "\n" + return_msg
 
     sample_perplexity = 0.0
-    if arguments["interactive"]:
-        pprint(arguments["sample"])
-        # THIS IS OPTIONAL - mainly used for debuggind reason
-        # 2. compute perplexity and print predictions for the complete log_probs tensor
-        sample_perplexity, return_msg = print_sentence_predictions(
-            arguments["original_log_probs"],
-            arguments["token_ids"],
-            arguments["vocab"],
-            masked_indices=arguments["masked_indices"],
-            print_generation=arguments["interactive"],
-        )
-        input("press enter to continue...")
-        msg += "\n" + return_msg
 
     return experiment_result, sample_MRR, sample_P, sample_perplexity, msg
-
-
-def run_thread_negated(arguments):
-
-    msg = ""
-
-    overlap, spearman, return_msg = metrics.get_negation_metric(
-        arguments["log_probs"],
-        arguments["masked_indices"],
-        arguments["log_probs_negated"],
-        arguments["masked_indices_negated"],
-        arguments["vocab"],
-        index_list=arguments["index_list"],
-    )
-
-    msg += "\n" + return_msg
-
-    return overlap, spearman, msg
-
-
-def lowercase_samples(samples, use_negated_probes=False):
-    new_samples = []
-    for sample in samples:
-        sample["obj_label"] = sample["obj_label"].lower()
-        sample["sub_label"] = sample["sub_label"].lower()
-        lower_masked_sentences = []
-        for sentence in sample["masked_sentences"]:
-            sentence = sentence.lower()
-            sentence = sentence.replace(base.MASK.lower(), base.MASK)
-            lower_masked_sentences.append(sentence)
-        sample["masked_sentences"] = lower_masked_sentences
-
-        if "negated" in sample and use_negated_probes:
-            for sentence in sample["negated"]:
-                sentence = sentence.lower()
-                sentence = sentence.replace(base.MASK.lower(), base.MASK)
-                lower_masked_sentences.append(sentence)
-            sample["negated"] = lower_masked_sentences
-
-        new_samples.append(sample)
-    return new_samples
 
 
 def filter_samples(model, samples, vocab_subset, max_sentence_length, template):
@@ -239,6 +160,8 @@ def filter_samples(model, samples, vocab_subset, max_sentence_length, template):
                 ).strip()
             else:
                 recostructed_word = None
+
+            # print(sample)
 
             excluded = False
             if not template or len(template) == 0:
@@ -274,23 +197,6 @@ def filter_samples(model, samples, vocab_subset, max_sentence_length, template):
                     sample["obj_label"]
                 )
                 samples_exluded += 1
-            # elif vocab_subset is not None and sample['obj_label'] not in vocab_subset:
-            #   msg += "\tEXCLUDED object label {} not in vocab subset\n".format(sample['obj_label'])
-            #   samples_exluded+=1
-            elif "judgments" in sample:
-                # only for Google-RE
-                num_no = 0
-                num_yes = 0
-                for x in sample["judgments"]:
-                    if x["judgment"] == "yes":
-                        num_yes += 1
-                    else:
-                        num_no += 1
-                if num_no > num_yes:
-                    # SKIP NEGATIVE EVIDENCE
-                    pass
-                else:
-                    new_samples.append(sample)
             else:
                 new_samples.append(sample)
         else:
@@ -308,10 +214,10 @@ def main(args, shuffle_data=True, model=None):
         raise ValueError('Please specify a single language model (e.g., --lm "bert").')
 
     msg = ""
-
     [model_type_name] = args.models_names
 
-    print(model)
+    # print("------- Model: {}".format(model))
+    # print("------- Args: {}".format(args))
     if model is None:
         model = build_model_by_name(model_type_name, args)
 
@@ -347,20 +253,14 @@ def main(args, shuffle_data=True, model=None):
             vocab_subset, logger
         )
 
-    logger.info("\n" + msg + "\n")
+    # logger.info("\n" + msg + "\n")
 
     # dump arguments on file for log
-    with open("{}/args.json".format(log_directory), "w") as outfile:
-        json.dump(vars(args), outfile)
-
-    # stats
-    samples_with_negative_judgement = 0
-    samples_with_positive_judgement = 0
+    # with open("{}/args.json".format(log_directory), "w") as outfile:
+    #     json.dump(vars(args), outfile)
 
     # Mean reciprocal rank
     MRR = 0.0
-    MRR_negative = 0.0
-    MRR_positive = 0.0
 
     # Precision at (default 10)
     Precision = 0.0
@@ -368,40 +268,13 @@ def main(args, shuffle_data=True, model=None):
     Precision_negative = 0.0
     Precision_positivie = 0.0
 
-    # spearman rank correlation
-    # overlap at 1
-    if args.use_negated_probes:
-        Spearman = 0.0
-        Overlap = 0.0
-        num_valid_negation = 0.0
-
     data = load_file(args.dataset_filename)
-
-    print(len(data))
-
-    if args.lowercase:
-        # lowercase all samples
-        logger.info("lowercasing all samples...")
-        all_samples = lowercase_samples(
-            data, use_negated_probes=args.use_negated_probes
-        )
-    else:
-        # keep samples as they are
-        all_samples = data
 
     all_samples, ret_msg = filter_samples(
         model, data, vocab_subset, args.max_sentence_length, args.template
     )
 
-    # OUT_FILENAME = "{}.jsonl".format(args.dataset_filename)
-    # with open(OUT_FILENAME, 'w') as outfile:
-    #     for entry in all_samples:
-    #         json.dump(entry, outfile)
-    #         outfile.write('\n')
-
-    logger.info("\n" + ret_msg + "\n")
-
-    print(len(all_samples))
+    # logger.info("\n" + ret_msg + "\n")
 
     # if template is active (1) use a single example for (sub,obj) and (2) ...
     if args.template and args.template != "":
@@ -412,7 +285,7 @@ def main(args, shuffle_data=True, model=None):
             if (sub, obj) not in facts:
                 facts.append((sub, obj))
         local_msg = "distinct template facts: {}".format(len(facts))
-        logger.info("\n" + local_msg + "\n")
+        # logger.info("\n" + local_msg + "\n")
         print(local_msg)
         all_samples = []
         for fact in facts:
@@ -445,12 +318,7 @@ def main(args, shuffle_data=True, model=None):
         shuffle(all_samples)
 
     samples_batches, sentences_batches, ret_msg = batchify(all_samples, args.batch_size)
-    logger.info("\n" + ret_msg + "\n")
-    if args.use_negated_probes:
-        sentences_batches_negated, ret_msg = batchify_negated(
-            all_samples, args.batch_size
-        )
-        logger.info("\n" + ret_msg + "\n")
+    # logger.info("\n" + ret_msg + "\n")
 
     # ThreadPool
     num_threads = args.threads
@@ -458,8 +326,10 @@ def main(args, shuffle_data=True, model=None):
         # use all available threads
         num_threads = multiprocessing.cpu_count()
     pool = ThreadPool(num_threads)
-    list_of_results = []
-
+    
+    # list_of_results = []
+    # list_of_ranks = []
+    item_count = 0
     for i in tqdm(range(len(samples_batches))):
 
         samples_b = samples_batches[i]
@@ -531,172 +401,55 @@ def main(args, shuffle_data=True, model=None):
 
         # multithread
         res = pool.map(run_thread, arguments)
-
-        if args.use_negated_probes:
-            sentences_b_negated = sentences_batches_negated[i]
-
-            # if no negated sentences in batch
-            if all(s[0] == "" for s in sentences_b_negated):
-                res_negated = [(float("nan"), float("nan"), "")] * args.batch_size
-            # eval negated batch
-            else:
-                (
-                    original_log_probs_list_negated,
-                    token_ids_list_negated,
-                    masked_indices_list_negated,
-                ) = model.get_batch_generation(sentences_b_negated, logger=logger)
-                if vocab_subset is not None:
-                    # filter log_probs
-                    filtered_log_probs_list_negated = model.filter_logprobs(
-                        original_log_probs_list_negated, filter_logprob_indices
-                    )
-                else:
-                    filtered_log_probs_list_negated = original_log_probs_list_negated
-
-                arguments = [
-                    {
-                        "log_probs": filtered_log_probs,
-                        "log_probs_negated": filtered_log_probs_negated,
-                        "token_ids": token_ids,
-                        "vocab": model.vocab,
-                        "label_index": label_index[0],
-                        "masked_indices": masked_indices,
-                        "masked_indices_negated": masked_indices_negated,
-                        "index_list": index_list,
-                    }
-                    for filtered_log_probs, filtered_log_probs_negated, token_ids, masked_indices, masked_indices_negated, label_index in zip(
-                        filtered_log_probs_list,
-                        filtered_log_probs_list_negated,
-                        token_ids_list,
-                        masked_indices_list,
-                        masked_indices_list_negated,
-                        label_index_list,
-                    )
-                ]
-                res_negated = pool.map(run_thread_negated, arguments)
-
+ 
         for idx, result in enumerate(res):
-
             result_masked_topk, sample_MRR, sample_P, sample_perplexity, msg = result
 
-            logger.info("\n" + msg + "\n")
+            # print("~~~~~~~~~~~~~~~~~~")
+            # print(result_masked_topk)
+
+            # logger.info("\n" + msg + "\n")
 
             sample = samples_b[idx]
 
             element = {}
-            element["sample"] = sample
-            element["uuid"] = sample["uuid"]
-            element["token_ids"] = token_ids_list[idx]
-            element["masked_indices"] = masked_indices_list[idx]
-            element["label_index"] = label_index_list[idx]
-            element["masked_topk"] = result_masked_topk
-            element["sample_MRR"] = sample_MRR
-            element["sample_Precision"] = sample_P
-            element["sample_perplexity"] = sample_perplexity
-            element["sample_Precision1"] = result_masked_topk["P_AT_1"]
+            obj = sample['obj_label']
+            sub = sample['sub_label']
+            element["masked_sentences"] = sample["masked_sentences"][0]
+            # element["uuid"] = sample["uuid"]
+            element["subject"] = sub
+            element["object"] = obj
+            element["rank"] = int(result_masked_topk['rank'])
+            # element["sample_Precision1"] = result_masked_topk["P_AT_1"]
 
-            # print()
-            # print("idx: {}".format(idx))
-            # print("masked_entity: {}".format(result_masked_topk['masked_entity']))
-            # for yi in range(10):
-            #     print("\t{} {}".format(yi,result_masked_topk['topk'][yi]))
-            # print("masked_indices_list: {}".format(masked_indices_list[idx]))
-            # print("sample_MRR: {}".format(sample_MRR))
-            # print("sample_P: {}".format(sample_P))
-            # print("sample: {}".format(sample))
-            # print()
+            # element["sample"] = sample
+            # element["token_ids"] = token_ids_list[idx]
+            # element["masked_indices"] = masked_indices_list[idx]
+            # element["label_index"] = label_index_list[idx]
+            element["masked_topk"] = result_masked_topk['topk'][:20]
+            # element["sample_MRR"] = sample_MRR
+            # element["sample_Precision"] = sample_P
+            # element["sample_perplexity"] = sample_perplexity
+            
+            # list_of_results[sub + "_" + obj].append(element)
+            # list_of_ranks[sub + "_" + obj].append(element["rank"])
 
-            if args.use_negated_probes:
-                overlap, spearman, msg = res_negated[idx]
-                # sum overlap and spearmanr if not nan
-                if spearman == spearman:
-                    element["spearmanr"] = spearman
-                    element["overlap"] = overlap
-                    Overlap += overlap
-                    Spearman += spearman
-                    num_valid_negation += 1.0
-
+            # print("~~~~~~ rank: {}".format(result_masked_topk['rank']))
             MRR += sample_MRR
             Precision += sample_P
-            Precision1 += element["sample_Precision1"]
+            Precision1 += result_masked_topk["P_AT_1"]
 
-            # the judgment of the annotators recording whether they are
-            # evidence in the sentence that indicates a relation between two entities.
-            num_yes = 0
-            num_no = 0
-
-            if "judgments" in sample:
-                # only for Google-RE
-                for x in sample["judgments"]:
-                    if x["judgment"] == "yes":
-                        num_yes += 1
-                    else:
-                        num_no += 1
-                if num_no >= num_yes:
-                    samples_with_negative_judgement += 1
-                    element["judgement"] = "negative"
-                    MRR_negative += sample_MRR
-                    Precision_negative += sample_P
-                else:
-                    samples_with_positive_judgement += 1
-                    element["judgement"] = "positive"
-                    MRR_positive += sample_MRR
-                    Precision_positivie += sample_P
-
-            list_of_results.append(element)
+            item_count += 1
+            append_data_line_to_jsonl("reproduction/data/P_AT_K/{}_rank_results.jsonl".format(args.label), element) 
+            append_data_line_to_jsonl("reproduction/data/P_AT_K/{}_rank_list.jsonl".format(args.label), element["rank"]) 
 
     pool.close()
     pool.join()
+    Precision1 /= item_count
 
-    # stats
-    # Mean reciprocal rank
-    MRR /= len(list_of_results)
-
-    # Precision
-    Precision /= len(list_of_results)
-    Precision1 /= len(list_of_results)
-
-    msg = "all_samples: {}\n".format(len(all_samples))
-    msg += "list_of_results: {}\n".format(len(list_of_results))
-    msg += "global MRR: {}\n".format(MRR)
-    msg += "global Precision at 10: {}\n".format(Precision)
-    msg += "global Precision at 1: {}\n".format(Precision1)
-
-    if args.use_negated_probes:
-        Overlap /= num_valid_negation
-        Spearman /= num_valid_negation
-        msg += "\n"
-        msg += "results negation:\n"
-        msg += "all_negated_samples: {}\n".format(int(num_valid_negation))
-        msg += "global spearman rank affirmative/negated: {}\n".format(Spearman)
-        msg += "global overlap at 1 affirmative/negated: {}\n".format(Overlap)
-
-    if samples_with_negative_judgement > 0 and samples_with_positive_judgement > 0:
-        # Google-RE specific
-        MRR_negative /= samples_with_negative_judgement
-        MRR_positive /= samples_with_positive_judgement
-        Precision_negative /= samples_with_negative_judgement
-        Precision_positivie /= samples_with_positive_judgement
-        msg += "samples_with_negative_judgement: {}\n".format(
-            samples_with_negative_judgement
-        )
-        msg += "samples_with_positive_judgement: {}\n".format(
-            samples_with_positive_judgement
-        )
-        msg += "MRR_negative: {}\n".format(MRR_negative)
-        msg += "MRR_positive: {}\n".format(MRR_positive)
-        msg += "Precision_negative: {}\n".format(Precision_negative)
-        msg += "Precision_positivie: {}\n".format(Precision_positivie)
-
-    logger.info("\n" + msg + "\n")
-    print("\n" + msg + "\n")
-
-    # dump pickle with the result of the experiment
-    all_results = dict(
-        list_of_results=list_of_results, global_MRR=MRR, global_P_at_10=Precision
-    )
-    with open("{}/result.pkl".format(log_directory), "wb") as f:
-        pickle.dump(all_results, f)
+    # save_data_line_to_jsonl("reproduction/data/TREx_filter/{}_rank_results.jsonl".format(args.label), list_of_results) # 3122
+    # save_data_line_to_jsonl("reproduction/data/TREx_filter/{}_rank_dic.jsonl".format(args.label), list_of_ranks) # 3122
+    # save_data_line_to_jsonl("reproduction/data/TREx_filter/{}_rank_list.jsonl".format(args.label), list(list_of_ranks.values())) # 3122
 
     return Precision1
 

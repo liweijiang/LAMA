@@ -84,6 +84,7 @@ def get_ranking(log_probs, masked_indices, vocab, label_index = None, index_list
         )
         PERPLEXITY = label_perplexity.item()
 
+        rank = -1
         if len(ranking_position) > 0 and ranking_position[0].shape[0] != 0:
             rank = ranking_position[0][0] + 1
 
@@ -95,6 +96,9 @@ def get_ranking(log_probs, masked_indices, vocab, label_index = None, index_list
                 P_AT_X = 1.
             if rank == 1:
                 P_AT_1 = 1.
+
+            # print("~~~~ rank")
+            # print(rank)
 
     experiment_result["MRR"] = MRR
     experiment_result["P_AT_X"] = P_AT_X
